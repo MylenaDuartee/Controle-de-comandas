@@ -48,7 +48,7 @@ DECLARE
     pk VARCHAR;
 BEGIN
     tabela:= LOWER(TRIM(nm_tabela));
-    pk:= LOWER(TRIM(nm_pk)); -- rever o bagui da chave primaria não existir nessa tabela especifica
+    pk:= LOWER(TRIM(nm_pk)); 
 
     IF tabela IS NULL OR tabela = '' THEN
         RAISE EXCEPTION 'O nome da tabela não pode ser vazio';
