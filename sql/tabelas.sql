@@ -17,7 +17,7 @@ CREATE TABLE funcionario (
 CREATE TABLE mesa (
     num_mesa SERIAL PRIMARY KEY,
     status CHAR(1) CHECK(status  IN ('O', 'L', 'R')) NOT NULL,
-    qtd_cadeira NUMERIC(2) NULL
+    qtd_cadeira NUMERIC(2) NOT NULL
 );
 
 CREATE TABLE categoria (
@@ -35,14 +35,14 @@ CREATE TABLE produto (
 CREATE TABLE fm_pagamento (
     cod_fp SERIAL PRIMARY KEY,
     nome_fp VARCHAR(20) NOT NULL,
-    descricao VARCHAR(60) NULL
+    descricao VARCHAR(60) NOT NULL
 );
 
 CREATE TABLE comanda (
     num_comanda SERIAL PRIMARY KEY,
-    valor_total NUMERIC(10,2) NULL,
+    valor_total NUMERIC(10,2) NOT NULL,
     status CHAR(1) CHECK(status IN ('A', 'F')) NOT NULL, 
-    taxa_serv NUMERIC(5,2) NULL,
+    taxa_serv NUMERIC(5,2) NOT NULL,
     num_mesa INT NOT NULL REFERENCES mesa(num_mesa),
     cod_func INT NOT NULL REFERENCES funcionario(cod_func)
 );
