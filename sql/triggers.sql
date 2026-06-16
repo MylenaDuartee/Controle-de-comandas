@@ -17,7 +17,7 @@ AFTER INSERT OR DELETE ON comanda
 FOR EACH ROW
 EXECUTE PROCEDURE fn_atualizar_status_mesa();
     
-DROP TRIGGER tg_atualizar_status_mesa ON comanda;
+-- DROP TRIGGER tg_atualizar_status_mesa ON comanda;
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_validar_comanda_pagamento()
@@ -41,8 +41,8 @@ BEFORE INSERT ON pagamento
 FOR EACH ROW
 EXECUTE PROCEDURE fn_validar_comanda_pagamento();
 
-DROP TRIGGER tg_validar_comanda_pagamento ON pagamento;
-DROP FUNCTION fn_validar_comanda_pagamento()
+-- DROP TRIGGER tg_validar_comanda_pagamento ON pagamento;
+-- DROP FUNCTION fn_validar_comanda_pagamento()
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_verificar_mesa_disponivel()
@@ -105,3 +105,34 @@ FOR EACH ROW
 EXECUTE FUNCTION fn_atualizar_total_comanda();
 
 --------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_fechar_comanda()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_total_pago NUMERIC(10,2);
+    v_valor_total NUMERIC(10,2);
+BEGIN
+    SELECT COALESCE(SUM(valor), 0) INTO v_total_pago
+    FROM pagamento WHERE num_comanda = NEW.num_comanda;
+
+    SELECT valor_total INTO v_valor_total
+    FROM comanda WHERE num_comanda = NEW.num_comanda;
+
+    IF v_total_pago > v_valor_total THEN
+        RAISE EXCEPTION 'Valor pago (%) ultrapassa o total da comanda (%)', v_total_pago, v_valor_total;
+    END IF;
+
+    IF v_total_pago = v_valor_total THEN
+        PERFORM update_tabela('comanda', 'num_comanda', NEW.num_comanda,
+            ARRAY['status'],
+            ARRAY['F']);
+        RAISE NOTICE 'Comanda % fechada automaticamente!', NEW.num_comanda;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE 'plpgsql';
+
+CREATE TRIGGER tg_fechar_comanda
+AFTER INSERT ON pagamento
+FOR EACH ROW
+EXECUTE FUNCTION fn_fechar_comanda();
