@@ -132,11 +132,13 @@ $$ LANGUAGE 'plpgsql';
 
 
 ------ Função deletar ------
-CREATE OR REPLACE FUNCTION deletar_linha(nm_tabela VARCHAR, nm_coluna VARCHAR, vl_coluna VARCHAR)
+CREATE OR REPLACE FUNCTION deletar_linha(nm_tabela VARCHAR, nm_colunas VARCHAR[], vl_colunas VARCHAR[])
 RETURNS VOID AS $$
 DECLARE
     text_sql TEXT;
+    where_sql TEXT := '';
     tabela VARCHAR:= LOWER(TRIM(nm_tabela));
+    i INT;
 BEGIN
     IF tabela IS NULL OR tabela = '' THEN
         RAISE EXCEPTION 'O nome da tabela não pode ser vazio';
@@ -146,7 +148,19 @@ BEGIN
         RAISE EXCEPTION 'A tabela "%" não existe', tabela;
     END IF;
 
-    text_sql:= FORMAT('DELETE FROM %I WHERE %I = %L',tabela,nm_coluna,vl_coluna);
+    IF ARRAY_LENGTH(nm_colunas,1) <> ARRAY_LENGTH(vl_colunas,1) THEN
+        RAISE EXCEPTION 'A quantidade de colunas não bate com a de valores';
+    END IF;
+
+    FOR i IN 1..ARRAY_LENGTH(nm_colunas,1) LOOP
+    where_sql := where_sql || FORMAT('%I = %L', nm_colunas[i], vl_colunas[i]);
+    IF i < ARRAY_LENGTH(nm_colunas,1) THEN
+        where_sql := where_sql || ' AND ';
+    END IF;
+    END LOOP;
+
+
+    text_sql:= FORMAT('DELETE FROM %I WHERE %s',tabela, where_sql);
     EXECUTE text_sql;
     RAISE NOTICE 'Linha deletada da tabela "%" com sucesso!', tabela;
 
