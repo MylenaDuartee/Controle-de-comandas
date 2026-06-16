@@ -5,8 +5,7 @@ BEGIN
     IF TG_OP = 'INSERT' THEN
         PERFORM update_tabela('mesa','num_mesa',NEW.num_mesa,ARRAY['status'],ARRAY['O']);
         RETURN NEW;
-    END IF;
-    IF TG_OP = 'DELETE' THEN
+    ELSIF TG_OP = 'DELETE' THEN
         PERFORM update_tabela('mesa','num_mesa',OLD.num_mesa,ARRAY['status'],ARRAY['L']);
         RETURN OLD;
     END IF;
@@ -16,7 +15,7 @@ $$ LANGUAGE 'plpgsql';
 CREATE TRIGGER tg_atualizar_status_mesa
 AFTER INSERT OR DELETE ON comanda
 FOR EACH ROW
-EXECUTE PROCEDURE fn_atualizar_status_mesa()
+EXECUTE PROCEDURE fn_atualizar_status_mesa();
     
 DROP TRIGGER tg_atualizar_status_mesa ON comanda;
 
@@ -64,7 +63,7 @@ $$ LANGUAGE 'plpgsql';
 CREATE TRIGGER tg_verificar_mesa_disponivel
 BEFORE INSERT ON comanda
 FOR EACH ROW
-EXECUTE PROCEDURE fn_verificar_mesa_disponivel()
+EXECUTE PROCEDURE fn_verificar_mesa_disponivel();
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_atualizar_total_comanda()
@@ -72,25 +71,29 @@ RETURNS TRIGGER AS $$
 DECLARE
     v_valor_unitario NUMERIC(10,2);
     v_diferenca NUMERIC(10,2);
+    v_novo_total NUMERIC(10,2);
 BEGIN
     IF TG_OP = 'INSERT' THEN
         SELECT valor_unit INTO v_valor_unitario FROM produto WHERE cod_prod = NEW.cod_prod;
         NEW.valor:= NEW.qtd * v_valor_unitario;
-        UPDATE comanda 
-        SET valor_total = COALESCE(valor_total, 0) + NEW.valor
-        WHERE num_comanda = NEW.num_comanda;
+
+        SELECT COALESCE(valor_total,0) + NEW.valor INTO v_novo_total FROM comanda WHERE num_comanda = NEW.num_comanda;
+
+        PERFORM update_tabela('comanda','num_comanda',NEW.num_comanda,ARRAY['valor_total'],ARRAY[v_novo_total::TEXT]);
         RETURN NEW;
+
     ELSIF TG_OP = 'UPDATE' THEN
         SELECT valor_unit INTO v_valor_unitario FROM produto WHERE cod_prod = NEW.cod_prod;
-        NEW.valor := NEW.qtd * v_valor_unitario;
+        NEW.valor:= NEW.qtd * v_valor_unitario;
         v_diferenca := NEW.valor - OLD.valor;
-        UPDATE comanda 
-        SET valor_total = COALESCE(valor_total, 0) + v_diferenca
-        WHERE num_comanda = NEW.num_comanda;
+
+        SELECT COALESCE(valor_total,0) + v_diferenca INTO v_novo_total FROM COMANDA WHERE num_comanda = NEW.num_comanda;
+
+        PERFORM update_tabela('comanda','num_comanda',NEW.num_comanda,ARRAY['valor_total'],ARRAY[v_novo_total::TEXT]);
         RETURN NEW;
     ELSIF TG_OP = 'DELETE' THEN
-        UPDATE comanda SET valor_total = valor_total - OLD.valor
-        WHERE num_comanda = OLD.num_comanda;
+        SELECT valor_total - OLD.valor INTO v_novo_total FROM comanda WHERE num_comanda = OLD.num_comanda;
+        PERFORM update_tabela('comanda','num_comanda',OLD.num_comanda,ARRAY['valor_total'],ARRAY[v_novo_total::TEXT]);
         RETURN OLD;
     END IF;
 END;

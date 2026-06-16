@@ -1,140 +1,68 @@
-
-
------- Função de inserir ------
-CREATE OR REPLACE FUNCTION inserir(nm_tabela VARCHAR, nm_colunas VARCHAR[], nm_valores VARCHAR[])
+--------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_cadastrar_cargo(c_nome VARCHAR,c_salario NUMERIC)
 RETURNS VOID AS $$
-DECLARE 
-    tabela VARCHAR;
-    text_sql TEXT;
 BEGIN
-
-    tabela :=  LOWER(TRIM(nm_tabela));
-
-    IF tabela IS NULL OR tabela = '' THEN
-        RAISE EXCEPTION 'O nome da tabela não pode estar vazio!';
+    IF EXISTS(SELECT * FROM cargo WHERE LOWER(nome) = LOWER(c_nome)) THEN
+        RAISE EXCEPTION 'Já existe um cargo com o nome "%"',c_nome;
     END IF;
 
-    IF ARRAY_LENGTH(nm_colunas,1) <> ARRAY_LENGTH(nm_valores,1) THEN
-        RAISE EXCEPTION 'A quantidade de colunas não bate com a de valores';
-    END IF;
-
-    IF tabela NOT IN ('cargo','funcionario','mesa','categoria','produto','fm_pagamento','comanda','pagamento','item_comanda') THEN
-        RAISE EXCEPTION 'A tabela "%" não existe',tabela;
-    END IF;
-
-    text_sql:= FORMAT('INSERT INTO %I (%s) VALUES (%s)', tabela, array_to_string(nm_colunas,', '), '''' || array_to_string(nm_valores, ''', ''') || '''');
-
-    EXECUTE text_sql;
-
-    RAISE NOTICE 'Inserção feita com sucesso!';
-
-EXCEPTION
-    WHEN undefined_column THEN
-        RAISE EXCEPTION 'A coluna "%" não existe na tabela "%"', nm_colunas,tabela;
-    WHEN OTHERS THEN
-        RAISE EXCEPTION 'Erro: %', SQLERRM;
+    PERFORM inserir('cargo',ARRAY['nome','salario'],ARRAY[c_nome,c_salario::TEXT]);
 END;
 $$ LANGUAGE 'plpgsql';
 
-
------- Função de update ------
-CREATE OR REPLACE FUNCTION update_tabela(nm_tabela VARCHAR,nm_pk VARCHAR, vl_pk INT, nm_colunas VARCHAR[],vl_colunas VARCHAR[])
+--------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_cadastrar_funcionario(f_nome VARCHAR,f_dt_nasc DATE,f_cod_cargo INT) -- verificar caso cargo não exista
 RETURNS VOID AS $$
-DECLARE
-    tabela VARCHAR;
-    text_sql TEXT;
-    i INT;
-    set_sql TEXT:= '';
-    pk VARCHAR;
 BEGIN
-    tabela:= LOWER(TRIM(nm_tabela));
-    pk:= LOWER(TRIM(nm_pk)); 
-
-    IF tabela IS NULL OR tabela = '' THEN
-        RAISE EXCEPTION 'O nome da tabela não pode ser vazio';
+    IF NOT EXISTS(SELECT * FROM cargo WHERE cod_cargo = f_cod_cargo) THEN
+        RAISE EXCEPTION 'Não existe cargo com o código "%"',f_cod_cargo;
     END IF;
 
-    IF ARRAY_LENGTH(nm_colunas,1) <> ARRAY_LENGTH(vl_colunas,1) THEN
-        RAISE EXCEPTION 'A quantidade de colunas não bate com a de valores';
-    END IF;
-    
-    IF tabela NOT IN ('cargo','funcionario','mesa','categoria','produto','fm_pagamento','comanda','pagamento','item_comanda') THEN
-        RAISE EXCEPTION 'A tabela "%" não existe', tabela;
-    END IF;
-
-    FOR i IN 1..ARRAY_LENGTH(nm_colunas,1) LOOP
-        set_sql:= set_sql || nm_colunas[i] || ' = ''' || vl_colunas[i]|| '''';
-        IF i < ARRAY_LENGTH(nm_colunas,1) THEN
-            set_sql:= set_sql || ', ';
-        END IF;
-    END LOOP;
-
-    text_sql:= FORMAT('UPDATE %I SET %s WHERE %I = %s',tabela,set_sql, pk, vl_pk);
-    EXECUTE text_sql;
-
-    RAISE NOTICE 'Update feito com sucesso!';
-
-    EXCEPTION
-    WHEN undefined_column THEN
-        RAISE EXCEPTION 'Uma das colunas não existem na tabela "%"',tabela;
-    WHEN OTHERS THEN
-        RAISE EXCEPTION 'Erro: %', SQLERRM;
+    PERFORM inserir('funcionario',ARRAY['nome','dt_nasc','cod_cargo'],ARRAY[f_nome,f_dt_nasc::TEXT,f_cod_cargo::TEXT]);
 END;
 $$ LANGUAGE 'plpgsql';
 
-
------- Função de Alterar ------
-CREATE OR REPLACE FUNCTION alterar_tabela(nm_tabela VARCHAR, nm_operacao VARCHAR, nm_coluna VARCHAR,nm_tipo VARCHAR)
+--------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_cadastrar_mesa(m_qtd_cadeira INT)
 RETURNS VOID AS $$
-DECLARE
-    operacao VARCHAR:= UPPER(nm_operacao);
-    text_sql TEXT;
 BEGIN
-    IF operacao = 'ADD' THEN
-        text_sql:= FORMAT('ALTER TABLE %I ADD COLUMN %I %s',nm_tabela,nm_coluna,nm_tipo);
-    ELSIF operacao = 'DROP' THEN
-        text_sql:= FORMAT('ALTER TABLE %I DROP COLUMN %I',nm_tabela,nm_coluna);
-    ELSIF operacao = 'ALTER' THEN
-        text_sql:= FORMAT('ALTER TABLE %I ALTER COLUMN %I TYPE %s',nm_tabela,nm_coluna,nm_tipo);
-    ELSE 
-        RAISE EXCEPTION 'Operacao "%" inválida!',operacao;
-    END IF; 
-
-    EXECUTE text_sql;
-    RAISE NOTICE 'Operação "%" na coluna "%" da tabela "%" realizada com sucesso!', operacao, nm_coluna, nm_tabela;
-
-EXCEPTION
-    WHEN dependent_objects_still_exist THEN
-        RAISE EXCEPTION 'Não é possível remover a coluna "%" pois ela é referenciada por outra tabela!', nm_coluna;
-    WHEN OTHERS THEN
-        RAISE EXCEPTION 'Erro: %', SQLERRM;
+    PERFORM inserir('mesa',ARRAY['status','qtd_cadeira'],ARRAY['L',m_qtd_cadeira::TEXT]);
 END;
 $$ LANGUAGE 'plpgsql';
 
-
------- Função deletar ------
-CREATE OR REPLACE FUNCTION deletar_linha(nm_tabela VARCHAR, nm_coluna VARCHAR, vl_coluna VARCHAR)
+--------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_cadastrar_categoria(cat_nome VARCHAR)
 RETURNS VOID AS $$
-DECLARE
-    text_sql VARCHAR;
-    tabela VARCHAR:= LOWER(TRIM(nm_tabela));
 BEGIN
-    IF tabela IS NULL OR tabela = '' THEN
-        RAISE EXCEPTION 'O nome da tabela não pode ser vazio';
+    IF EXISTS(SELECT * FROM categoria WHERE LOWER(nome) = LOWER(cat_nome)) THEN
+        RAISE EXCEPTION 'Já existe categoria com o nome "%"',cat_nome;
     END IF;
 
-    IF tabela NOT IN ('cargo','funcionario','mesa','categoria','produto','fm_pagamento','comanda','pagamento','item_comanda') THEN
-        RAISE EXCEPTION 'A tabela "%" não existe', tabela;
-    END IF;
-
-    text_sql:= FORMAT('DELETE FROM %I WHERE %I =''%s''',tabela,nm_coluna,vl_coluna);
-    EXECUTE text_sql;
-    RAISE NOTICE 'Linha deletada da tabela "%" com sucesso!', tabela;
-
-EXCEPTION
-    WHEN foreign_key_violation THEN
-        RAISE EXCEPTION 'Não é possível deletar pois este registro é referenciado por outra tabela!';
-    WHEN OTHERS THEN
-        RAISE EXCEPTION 'Erro: %', SQLERRM;
+    PERFORM inserir('categoria',ARRAY['nome'],ARRAY[cat_nome]);
 END;
 $$ LANGUAGE 'plpgsql';
+
+--------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_cadastrar_produto(p_nome VARCHAR,p_valor_unit NUMERIC,p_cod_cat INT)
+RETURNS VOID AS $$
+BEGIN 
+    IF NOT EXISTS(SELECT * FROM categoria WHERE cod_cat = p_cod_cat) THEN
+        RAISE EXCEPTION 'A categoria com código "%" não existe',p_cod_cat;
+    END IF;
+
+    PERFORM inserir('produto',ARRAY['nome','valor_unit','cod_cat'],ARRAY[p_nome,p_valor_unit::TEXT,p_cod_cat::TEXT]);
+END;
+$$ LANGUAGE 'plpgsql';
+
+--------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_cadastrar_forma_pagamento(fp_nome VARCHAR,fp_descricao VARCHAR)
+RETURNS VOID AS $$
+BEGIN
+    IF EXISTS(SELECT * FROM forma_pagamento WHERE LOWER(nome_fp) = LOWER(fp_nome)) THEN
+        RAISE EXCEPTION 'Já existe forma de pagamento com o nome de "%"',fp_nome;
+    END IF;
+
+    PERFORM inserir('forma_pagamento',ARRAY['nome_fp','descricao'],ARRAY[fp_nome,fp_descricao]);
+END;
+$$ LANGUAGE 'plpgsql';
+--------------------------------------------------------------------------
