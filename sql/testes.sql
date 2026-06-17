@@ -13,7 +13,7 @@ SELECT fn_adicionar_item(1, 1, 3); -- 3 Refrigerantes (3x 6 = 18)
 SELECT * FROM vw_itens_comanda WHERE num_comanda = 1;
 SELECT * FROM vw_comandas_abertas WHERE num_comanda = 1;
 
--- Realiza o pagamento total (74.80) via Pix (ID 3)
+-- Realiza o pagamento total (74.80) via Pix (ID 3).
 SELECT fn_realizar_pagamento(1, 3, 74.80);
 
 -- A comanda deve sumir de ABERTAS
