@@ -8,19 +8,19 @@ BEGIN
 
     PERFORM inserir('cargo',ARRAY['nome','salario'],ARRAY[c_nome,c_salario::TEXT]);
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;;
 
 --------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_cadastrar_funcionario(f_nome VARCHAR,f_dt_nasc DATE,f_cod_cargo INT) -- verificar caso cargo não exista
+CREATE OR REPLACE FUNCTION fn_cadastrar_funcionario(f_nome VARCHAR,f_dt_nasc DATE,f_cod_cargo INT,f_usuario VARCHAR) -- verificar caso cargo não exista
 RETURNS VOID AS $$
 BEGIN
     IF NOT EXISTS(SELECT * FROM cargo WHERE cod_cargo = f_cod_cargo) THEN
         RAISE EXCEPTION 'Não existe cargo com o código "%"',f_cod_cargo;
     END IF;
 
-    PERFORM inserir('funcionario',ARRAY['nome','dt_nasc','cod_cargo'],ARRAY[f_nome,f_dt_nasc::TEXT,f_cod_cargo::TEXT]);
+    PERFORM inserir('funcionario',ARRAY['nome','dt_nasc','cod_cargo','usuario'],ARRAY[f_nome,f_dt_nasc::TEXT,f_cod_cargo::TEXT,f_usuario]);
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_cadastrar_mesa(m_qtd_cadeira INT)
@@ -28,7 +28,7 @@ RETURNS VOID AS $$
 BEGIN
     PERFORM inserir('mesa',ARRAY['status','qtd_cadeira'],ARRAY['L',m_qtd_cadeira::TEXT]);
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_cadastrar_categoria(cat_nome VARCHAR)
@@ -40,7 +40,7 @@ BEGIN
 
     PERFORM inserir('categoria',ARRAY['nome'],ARRAY[cat_nome]);
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_cadastrar_produto(p_nome VARCHAR,p_valor_unit NUMERIC,p_cod_cat INT)
@@ -52,7 +52,7 @@ BEGIN
 
     PERFORM inserir('produto',ARRAY['nome','valor_unit','cod_cat'],ARRAY[p_nome,p_valor_unit::TEXT,p_cod_cat::TEXT]);
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_cadastrar_forma_pagamento(fp_nome VARCHAR,fp_descricao VARCHAR)
@@ -64,21 +64,27 @@ BEGIN
 
     PERFORM inserir('forma_pagamento',ARRAY['nome_fp','descricao'],ARRAY[fp_nome,fp_descricao]);
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 --------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_abrir_comanda(ac_num_mesa INT,ac_cod_func INT)
+CREATE OR REPLACE FUNCTION fn_abrir_comanda(ac_num_mesa INT)
 RETURNS VOID AS $$
+DECLARE
+    ac_cod_func INT;
 BEGIN
     IF NOT EXISTS(SELECT * FROM mesa WHERE num_mesa = ac_num_mesa) THEN
         RAISE EXCEPTION 'A mesa de número "%" não existe',ac_num_mesa;
-    ELSIF NOT EXISTS(SELECT * FROM funcionario WHERE cod_func = ac_cod_func) THEN
-        RAISE EXCEPTION 'O funcionário de código "%" não existe',ac_cod_func;
+    END IF;
+
+    SELECT cod_func INTO ac_cod_func FROM funcionario WHERE usuario = SESSION_USER;
+
+    IF ac_cod_func IS NULL THEN
+        RAISE EXCEPTION 'Usuário "%" não está vinculado a nenhum funcionário', SESSION_USER;
     END IF;
 
     PERFORM inserir('comanda',ARRAY['valor_total','status','taxa_serv','num_mesa','cod_func'],ARRAY['0','A','10.00',ac_num_mesa::TEXT,ac_cod_func::TEXT]);
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_adicionar_item(ai_num_comanda INT,ai_cod_prod INT, ai_qtd INT)
@@ -98,7 +104,7 @@ BEGIN
 
     PERFORM inserir('item_comanda', ARRAY['num_comanda','cod_prod','qtd','valor'],ARRAY[ai_num_comanda::TEXT, ai_cod_prod::TEXT, ai_qtd::TEXT, '0']);
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_remover_item(ri_num_comanda INT, ri_cod_prod INT)
@@ -116,17 +122,14 @@ BEGIN
         ARRAY['num_comanda','cod_prod'],
         ARRAY[ri_num_comanda::TEXT, ri_cod_prod::TEXT]);
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 --------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION fn_realizar_pagamento(
-    rp_num_comanda INT,
-    rp_cod_fp INT,
-    rp_valor NUMERIC(10,2)
-)
+CREATE OR REPLACE FUNCTION fn_realizar_pagamento(rp_num_comanda INT,rp_cod_fp INT,rp_valor NUMERIC(10,2))
 RETURNS VOID AS $$
 DECLARE
-    v_status CHAR(1);
+    rp_status CHAR(1);
+    rp_data TIMESTAMP;
 BEGIN
     IF NOT EXISTS(SELECT 1 FROM comanda WHERE num_comanda = rp_num_comanda) THEN
         RAISE EXCEPTION 'A comanda com número "%" não existe', rp_num_comanda;
@@ -136,19 +139,21 @@ BEGIN
         RAISE EXCEPTION 'A forma de pagamento com código "%" não existe', rp_cod_fp;
     END IF;
 
-    SELECT status INTO v_status FROM comanda WHERE num_comanda = rp_num_comanda;
+    SELECT status INTO rp_status FROM comanda WHERE num_comanda = rp_num_comanda;
 
-    IF v_status = 'F' THEN
+    IF rp_status = 'F' THEN
         RAISE EXCEPTION 'A comanda "%" já está fechada', rp_num_comanda;
     END IF;
 
+    rp_data:= CURRENT_DATE;
+
     PERFORM inserir('pagamento',
         ARRAY['data','valor','num_comanda','cod_fp'],
-        ARRAY[CURRENT_DATE::TEXT, rp_valor::TEXT, rp_num_comanda::TEXT, rp_cod_fp::TEXT]);
+        ARRAY[rp_data::TEXT, rp_valor::TEXT, rp_num_comanda::TEXT, rp_cod_fp::TEXT]);
 
     RAISE NOTICE 'Pagamento registrado com sucesso na comanda %!', rp_num_comanda;
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_atualizar_produto(ap_cod_prod INT, ap_nome VARCHAR, ap_valor_unit NUMERIC)
@@ -162,7 +167,7 @@ BEGIN
         ARRAY['nome','valor_unit'],
         ARRAY[ap_nome, ap_valor_unit::TEXT]);
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_atualizar_cargo(ac_cod_cargo INT, ac_nome VARCHAR, ac_salario NUMERIC)
@@ -176,7 +181,7 @@ BEGIN
         ARRAY['nome','salario'],
         ARRAY[ac_nome, ac_salario::TEXT]);
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_atualizar_quantidade_item(aqi_num_comanda INT, aqi_cod_prod INT, aqi_qtd INT)
@@ -189,7 +194,7 @@ BEGIN
     UPDATE item_comanda SET qtd = aqi_qtd
     WHERE num_comanda = aqi_num_comanda AND cod_prod = aqi_cod_prod;
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_remover_produto(rp_cod_prod INT)
@@ -201,7 +206,7 @@ BEGIN
 
     PERFORM deletar_linha('produto', ARRAY['cod_prod'], ARRAY[rp_cod_prod::TEXT]);
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_remover_cargo(rc_cod_cargo INT)
@@ -213,7 +218,7 @@ BEGIN
 
     PERFORM deletar_linha('cargo', ARRAY['cod_cargo'], ARRAY[rc_cod_cargo::TEXT]);
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_remover_forma_pagamento(rfp_cod_fp INT)
@@ -225,4 +230,64 @@ BEGIN
 
     PERFORM deletar_linha('forma_pagamento', ARRAY['cod_fp'], ARRAY[rfp_cod_fp::TEXT]);
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
+
+--------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION fn_transferir_comanda_mesa(tcm_num_comanda INT, tcm_num_nova_mesa INT)
+RETURNS VOID AS $$
+DECLARE
+    tcm_st CHAR(1);
+    tcm_mesa_antiga INT;
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM comanda WHERE num_comanda = tcm_num_comanda) THEN
+        RAISE EXCEPTION 'Comanda "%" não existe', tcm_num_comanda;
+    END IF;
+
+    SELECT status INTO tcm_st FROM mesa WHERE num_mesa = tcm_num_nova_mesa;
+
+    IF tcm_st IS NULL THEN
+        RAISE EXCEPTION 'A mesa "%" não existe', tcm_num_nova_mesa;
+    ELSIF tcm_st = 'O' THEN
+        RAISE EXCEPTION 'A mesa "%" já está ocupada', tcm_num_nova_mesa;
+    END IF;
+
+    SELECT num_mesa INTO tcm_mesa_antiga FROM comanda WHERE num_comanda = tcm_num_comanda;
+
+    PERFORM update_tabela('comanda', 'num_comanda', tcm_num_comanda,
+        ARRAY['num_mesa'], ARRAY[tcm_num_nova_mesa::TEXT]);
+
+    PERFORM update_tabela('mesa', 'num_mesa', tcm_mesa_antiga,
+        ARRAY['status'], ARRAY['L']);
+
+    PERFORM update_tabela('mesa', 'num_mesa', tcm_num_nova_mesa,
+        ARRAY['status'], ARRAY['O']);
+
+    RAISE NOTICE 'Comanda % transferida da mesa % para a mesa %!', tcm_num_comanda, tcm_mesa_antiga, tcm_num_nova_mesa;
+END;
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
+
+--------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION fn_cancelar_comanda(cc_num_comanda INT)
+RETURNS VOID AS $$
+DECLARE
+    cc_num_mesa INT;
+BEGIN
+    SELECT num_mesa INTO cc_num_mesa FROM comanda WHERE num_comanda = cc_num_comanda;
+
+    IF cc_num_mesa IS NULL THEN
+        RAISE EXCEPTION 'Comanda "%" não existe', cc_num_comanda;
+    END IF;
+
+    PERFORM deletar_linha('item_comanda', ARRAY['num_comanda'], ARRAY[cc_num_comanda::TEXT]);
+
+    PERFORM update_tabela('comanda', 'num_comanda', cc_num_comanda,
+        ARRAY['valor_total','status','taxa_serv'],
+        ARRAY['0','F','0']);
+
+    PERFORM update_tabela('mesa', 'num_mesa', cc_num_mesa,
+        ARRAY['status'], ARRAY['L']);
+
+    RAISE NOTICE 'Comanda % cancelada e mesa % liberada!', cc_num_comanda, cc_num_mesa;
+END;
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;

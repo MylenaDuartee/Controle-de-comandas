@@ -48,7 +48,7 @@ EXCEPTION
     WHEN OTHERS THEN
         RAISE EXCEPTION 'Erro: %', SQLERRM;
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 
 ------ Função de update ------
@@ -94,11 +94,11 @@ BEGIN
     WHEN OTHERS THEN
         RAISE EXCEPTION 'Erro: %', SQLERRM;
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 
 ------ Função de Alterar ------
-CREATE OR REPLACE FUNCTION alterar_tabela(nm_tabela VARCHAR, nm_operacao VARCHAR, nm_coluna VARCHAR,nm_tipo VARCHAR)
+CREATE OR REPLACE FUNCTION alterar_tabela(nm_tabela VARCHAR, nm_operacao VARCHAR, nm_coluna VARCHAR,nm_tipo VARCHAR) --> colocar defount?
 RETURNS VOID AS $$
 DECLARE
     operacao VARCHAR:= UPPER(nm_operacao);
@@ -128,7 +128,7 @@ EXCEPTION
     WHEN OTHERS THEN
         RAISE EXCEPTION 'Erro: %', SQLERRM;
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 
 ------ Função deletar ------
@@ -170,4 +170,4 @@ EXCEPTION
     WHEN OTHERS THEN
         RAISE EXCEPTION 'Erro: %', SQLERRM;
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;

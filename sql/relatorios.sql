@@ -33,3 +33,42 @@ JOIN produto prod ON item.cod_prod = prod.cod_prod
 JOIN categoria cat ON prod.cod_cat = cat.cod_cat
 GROUP BY prod.nome, cat.nome
 ORDER BY quantidade_total_vendida DESC;
+
+--------------------------------------------------------------------------
+CREATE OR REPLACE VIEW vw_comandas_abertas AS
+SELECT 
+    c.num_comanda,
+    m.num_mesa,
+    f.nome AS garcom,
+    c.valor_total,
+    c.taxa_serv
+FROM comanda c
+JOIN mesa m ON c.num_mesa = m.num_mesa
+JOIN funcionario f ON c.cod_func = f.cod_func
+WHERE c.status = 'A'
+ORDER BY c.num_comanda;
+
+--------------------------------------------------------------------------
+CREATE OR REPLACE VIEW vw_itens_comanda AS
+SELECT 
+    ic.num_comanda,
+    p.nome AS produto,
+    ic.qtd,
+    ic.valor
+FROM item_comanda ic
+JOIN produto p ON ic.cod_prod = p.cod_prod
+JOIN comanda c ON ic.num_comanda = c.num_comanda
+WHERE c.status = 'A'
+ORDER BY ic.num_comanda;
+
+--------------------------------------------------------------------------
+CREATE OR REPLACE VIEW vw_ticket_medio_mesa AS
+SELECT
+    m.num_mesa,
+    COUNT(c.num_comanda) AS total_comandas,
+    ROUND(AVG(c.valor_total), 2) AS ticket_medio
+FROM comanda c
+JOIN mesa m ON c.num_mesa = m.num_mesa
+WHERE c.status = 'F'
+GROUP BY m.num_mesa
+ORDER BY ticket_medio DESC;
