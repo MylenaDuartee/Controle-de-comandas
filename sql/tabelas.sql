@@ -65,3 +65,30 @@ CREATE TABLE item_comanda (
 );
 
 
+-- CADASTRAR CARGOS
+SELECT fn_cadastrar_cargo('Gerente', 4500.00);
+SELECT fn_cadastrar_cargo('Garçom', 2100.00);
+
+-- CADASTRAR FUNCIONÁRIOS
+SELECT fn_cadastrar_funcionario('Funcionario Gerente', '1995-05-19', 1, 'user_gerente');
+SELECT fn_cadastrar_funcionario('Funcionario Garçom', '1998-08-10', 2, 'user_garcom');
+
+-- CADASTRAR MESAS
+SELECT fn_cadastrar_mesa(4); -- Mesa 1
+SELECT fn_cadastrar_mesa(2); -- Mesa 2
+SELECT fn_cadastrar_mesa(6); -- Mesa 3
+
+-- CADASTRAR CATEGORIAS
+SELECT fn_cadastrar_categoria('Bebidas');
+SELECT fn_cadastrar_categoria('Comidas');
+
+-- CADASTRAR PRODUTOS
+SELECT fn_cadastrar_produto('Refrigerante', 6.00, 1);
+SELECT fn_cadastrar_produto('Cerveja', 10.00, 1);
+SELECT fn_cadastrar_produto('Hambúrguer', 25.00, 2);
+SELECT fn_cadastrar_produto('Batata Frita', 18.00, 2);
+
+-- CADASTRAR FORMAS DE PAGAMENTO
+SELECT fn_cadastrar_forma_pagamento('Dinheiro', 'Pagamento em espécie');
+SELECT fn_cadastrar_forma_pagamento('Cartão de Crédito', 'Visa, Mastercard, Elo');
+SELECT fn_cadastrar_forma_pagamento('Pix', 'Transferência instantânea');
