@@ -10,7 +10,7 @@ BEGIN
         RETURN OLD;
     END IF;
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 CREATE TRIGGER tg_atualizar_status_mesa
 AFTER INSERT OR DELETE ON comanda
@@ -34,7 +34,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 CREATE TRIGGER tg_validar_comanda_pagamento
 BEFORE INSERT ON pagamento
@@ -58,7 +58,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 CREATE TRIGGER tg_verificar_mesa_disponivel
 BEFORE INSERT ON comanda
@@ -72,12 +72,17 @@ DECLARE
     v_valor_unitario NUMERIC(10,2);
     v_diferenca NUMERIC(10,2);
     v_novo_total NUMERIC(10,2);
+    v_taxa NUMERIC(5,2);
 BEGIN
     IF TG_OP = 'INSERT' THEN
         SELECT valor_unit INTO v_valor_unitario FROM produto WHERE cod_prod = NEW.cod_prod;
         NEW.valor:= NEW.qtd * v_valor_unitario;
 
-        SELECT COALESCE(valor_total,0) + NEW.valor INTO v_novo_total FROM comanda WHERE num_comanda = NEW.num_comanda;
+        SELECT taxa_serv INTO v_taxa FROM comanda WHERE num_comanda = NEW.num_comanda;
+
+        SELECT (COALESCE(valor_total,0) / (1 + v_taxa /100)) + NEW.valor INTO v_novo_total FROM comanda WHERE num_comanda = NEW.num_comanda;
+
+        v_novo_total := v_novo_total * (1 + v_taxa / 100.0);
 
         PERFORM update_tabela('comanda','num_comanda',NEW.num_comanda,ARRAY['valor_total'],ARRAY[v_novo_total::TEXT]);
         RETURN NEW;
@@ -87,22 +92,35 @@ BEGIN
         NEW.valor:= NEW.qtd * v_valor_unitario;
         v_diferenca := NEW.valor - OLD.valor;
 
-        SELECT COALESCE(valor_total,0) + v_diferenca INTO v_novo_total FROM COMANDA WHERE num_comanda = NEW.num_comanda;
+        SELECT taxa_serv INTO v_taxa FROM comanda WHERE num_comanda = NEW.num_comanda;
+
+        SELECT (COALESCE(valor_total, 0) / (1 + v_taxa / 100)) + v_diferenca INTO v_novo_total 
+        FROM comanda WHERE num_comanda = NEW.num_comanda;
+
+        v_novo_total := v_novo_total * (1 + v_taxa / 100);
 
         PERFORM update_tabela('comanda','num_comanda',NEW.num_comanda,ARRAY['valor_total'],ARRAY[v_novo_total::TEXT]);
         RETURN NEW;
     ELSIF TG_OP = 'DELETE' THEN
-        SELECT valor_total - OLD.valor INTO v_novo_total FROM comanda WHERE num_comanda = OLD.num_comanda;
+        SELECT taxa_serv INTO v_taxa FROM comanda WHERE num_comanda = OLD.num_comanda;
+
+        SELECT (valor_total / (1 + v_taxa / 100)) - OLD.valor INTO v_novo_total 
+        FROM comanda WHERE num_comanda = OLD.num_comanda;
+
+        v_novo_total := v_novo_total * (1 + v_taxa / 100);
+        
         PERFORM update_tabela('comanda','num_comanda',OLD.num_comanda,ARRAY['valor_total'],ARRAY[v_novo_total::TEXT]);
         RETURN OLD;
     END IF;
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 CREATE TRIGGER tg_atualizar_total_comanda
 BEFORE INSERT OR UPDATE OR DELETE ON item_comanda
 FOR EACH ROW
 EXECUTE FUNCTION fn_atualizar_total_comanda();
+
+--DROP TRIGGER tg_atualizar_total_comanda on item_comanda
 
 --------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION fn_fechar_comanda()
@@ -130,7 +148,7 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE 'plpgsql' SECURITY DEFINER;
 
 CREATE TRIGGER tg_fechar_comanda
 AFTER INSERT ON pagamento

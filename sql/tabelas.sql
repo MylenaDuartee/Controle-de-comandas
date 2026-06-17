@@ -11,6 +11,7 @@ CREATE TABLE funcionario (
     cod_func SERIAL PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
     dt_nasc DATE NOT NULL,
+    usuario VARCHAR(50),
     cod_cargo INT NOT NULL REFERENCES cargo(cod_cargo)
 );
 
