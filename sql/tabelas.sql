@@ -64,7 +64,6 @@ CREATE TABLE item_comanda (
     PRIMARY KEY (num_comanda, cod_prod) 
 );
 
-
 -- CADASTRAR CARGOS
 SELECT fn_cadastrar_cargo('Gerente', 4500.00);
 SELECT fn_cadastrar_cargo('Garçom', 2100.00);
@@ -77,6 +76,7 @@ SELECT fn_cadastrar_funcionario('Funcionario Garçom', '1998-08-10', 2, 'user_ga
 SELECT fn_cadastrar_mesa(4); -- Mesa 1
 SELECT fn_cadastrar_mesa(2); -- Mesa 2
 SELECT fn_cadastrar_mesa(6); -- Mesa 3
+SELECT fn_cadastrar_mesa(4); -- Mesa 4
 
 -- CADASTRAR CATEGORIAS
 SELECT fn_cadastrar_categoria('Bebidas');
